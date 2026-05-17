@@ -13,9 +13,9 @@ internal static class TestWorlds
         new BuildingData("barracks", "Barracks", Cost: 200, Width: 3, Height: 2, CreditsPerSecond: 0.0f, new ColorRgb(200, 80, 80)),
     });
 
-    public static World Fresh(int credits = 500, int gridSize = 16)
+    public static World Fresh(int credits = 500, int gridSize = 16, ulong seed = 0xDEADBEEFUL)
     {
         Grid grid = new(gridSize, gridSize, tileSize: 32);
-        return new World(grid, Catalog(), credits);
+        return new World(grid, Catalog(), credits, seed);
     }
 }

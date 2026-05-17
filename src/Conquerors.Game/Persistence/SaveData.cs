@@ -8,7 +8,9 @@ public sealed record SaveData(
     int Credits,
     double ResourceCarry,
     int NextEntityId,
-    List<BuildingSave> Buildings);
+    List<BuildingSave> Buildings,
+    ulong RngSeed = 0,
+    ulong RngState = 0);
 
 /// <summary>Serialised building. References a catalog definition by id.</summary>
 public sealed record BuildingSave(int Id, string DefinitionId, int X, int Y);

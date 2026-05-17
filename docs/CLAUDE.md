@@ -40,6 +40,12 @@ Draw
 
 `World` is the single source of truth. Tests construct one directly (no MonoGame needed) — see `TestWorlds`.
 
+## Seeded RNG (Phase 2 prereq #3)
+
+`World.Rng` (`MatchRng`) is the single source of gameplay randomness. It uses xorshift64* with a SplitMix64 seed finalizer — chosen for stability across .NET versions and architectures. **Never call `Random.Shared` or `new Random()` from sim code.** Saves persist `Rng.Seed` (audit) and `Rng.State` (resume), so reloading a mid-match save continues the RNG sequence exactly where it stopped.
+
+Phase 2 doesn't draw from `Rng` yet; the plumbing is in place so Phase 3 (bot decisions) and later combat (random target tiebreaking, projectile spread if any) don't have to retrofit. Seed comes from the match config when one exists; the Phase 2 sandbox uses a constant (`GameRoot.SandboxSeed`).
+
 ## Sim tick (Phase 2 prereq #2)
 
 Render runs at the host's framerate; the simulation advances in fixed 50ms steps (`SimClock.TicksPerSecond = 20`). `GameRoot.Update` calls `SimClock.Advance(dt)`, which returns how many tick steps to execute. Each step runs `ResourceSystem.Update` (with constant `SimClock.TickDt`) and `CommandProcessor.ProcessAll`. Camera/input/render stay per-frame.

@@ -14,15 +14,17 @@ public sealed class World
     public BuildingCatalog Catalog { get; }
     public List<Building> Buildings { get; }
     public int Credits { get; set; }
+    public MatchRng Rng { get; }
 
     private int _nextEntityId;
 
-    public World(Grid grid, BuildingCatalog catalog, int startingCredits)
+    public World(Grid grid, BuildingCatalog catalog, int startingCredits, ulong rngSeed = 0)
     {
         Grid = grid;
         Catalog = catalog;
         Buildings = new List<Building>();
         Credits = startingCredits;
+        Rng = new MatchRng(rngSeed);
         _nextEntityId = 1;
     }
 

@@ -33,7 +33,9 @@ public sealed class WorldSerializer
             world.Credits,
             resources.Carry,
             world.PeekNextId(),
-            buildings);
+            buildings,
+            world.Rng.Seed,
+            world.Rng.State);
 
         string? dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
@@ -63,6 +65,12 @@ public sealed class WorldSerializer
         world.Grid.Clear();
         world.Credits = data.Credits;
         resources.SetCarry(data.ResourceCarry);
+        // RngState is the resume-point; Seed is metadata. Old (pre-rng) saves omit
+        // both fields → STJ defaults to 0 → MatchRng treats that as a fresh seed.
+        if (data.RngState != 0)
+        {
+            world.Rng.SetState(data.RngState);
+        }
         foreach (BuildingSave bs in data.Buildings)
         {
             if (!world.Catalog.Contains(bs.DefinitionId))

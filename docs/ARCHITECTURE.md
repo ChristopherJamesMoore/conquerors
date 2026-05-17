@@ -66,6 +66,7 @@ The gameplay world and its primitives. No rendering. Minimal MG: uses `Vector2` 
 - `World` — grid + catalog + buildings + credits + entity id counter.
 - `PlayerId` — identifies a player throughout a match. Phase 2 has one local human + an optional dummy; the schema supports up to 10.
 - `SimClock` — fixed-timestep scheduler. `Advance(dt)` accumulates real seconds and returns whole sim ticks (20Hz) for the caller to step. Decouples sim from render — essential for deterministic lockstep MP.
+- `MatchRng` — per-match xorshift64* PRNG seeded at world construction. The only sanctioned source of gameplay randomness; stable across .NET versions and architectures. `Rng` is owned by `World`; saves persist seed + state for resumeable matches.
 - `GameRoot` — MonoGame `Game` subclass. Wiring + loop. The one class that pulls everything together.
 
 ### `Conquerors.Commands`
@@ -147,9 +148,10 @@ Program.Main
 | Build mode + selected defn    | `PlacementSystem`               |
 | Pending commands (this tick)  | `CommandBuffer`                 |
 | Sim tick count + accumulator  | `SimClock`                      |
+| Match RNG seed + state        | `World.Rng` (`MatchRng`)        |
 | Camera position + zoom        | `Camera2D`                      |
 | Edge scroll on/off            | `CameraSystem.EdgeScrollEnabled`|
 | FPS sampler window            | `FpsCounter`                    |
 | Save path                     | `SavePaths` (computed)          |
 
-Persistence saves: Credits, ResourceCarry, NextEntityId, Buildings. Camera state and edge-scroll toggle are session-only by design.
+Persistence saves: Credits, ResourceCarry, NextEntityId, Buildings, Rng seed + state. Camera state and edge-scroll toggle are session-only by design.

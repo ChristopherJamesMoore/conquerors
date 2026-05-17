@@ -24,6 +24,7 @@ public sealed class GameRoot : Game
     public const int GridHeightTiles = 64;
     public const int TilePixels = 32;
     public const int StartingCredits = 500;
+    public const ulong SandboxSeed = 0xC0117EE7_C0117EE7UL;
 
     private readonly GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch = null!;
@@ -84,7 +85,7 @@ public sealed class GameRoot : Game
         BuildingCatalog catalog = BuildingCatalog.LoadFromJson(catalogPath);
 
         Grid grid = new(GridWidthTiles, GridHeightTiles, TilePixels);
-        _world = new World(grid, catalog, StartingCredits);
+        _world = new World(grid, catalog, StartingCredits, SandboxSeed);
         TileCoord hqTile = new(GridWidthTiles / 2 - 1, GridHeightTiles / 2 - 1);
         _world.AddBuilding(new Building(_world.NextId(), "hq", hqTile));
 

@@ -46,6 +46,56 @@ public class WorldSerializerTests
     }
 
     [Fact]
+    public void RoundTrip_PreservesRngState()
+    {
+        World w = TestWorlds.Fresh(credits: 0, seed: 0x12345);
+        // Advance the rng so State diverges from initial seed-state.
+        for (int i = 0; i < 20; i++) w.Rng.NextUInt64();
+        ulong stateAtSave = w.Rng.State;
+
+        string path = Path.Combine(Path.GetTempPath(), $"conquerors-rng-{System.Guid.NewGuid()}.json");
+        try
+        {
+            new WorldSerializer().Save(w, new ResourceSystem(), path);
+            ulong expectedNext = w.Rng.NextUInt64();
+
+            World w2 = TestWorlds.Fresh(credits: 0, seed: 0x12345);
+            new WorldSerializer().Load(w2, new ResourceSystem(), path);
+
+            Assert.Equal(stateAtSave, w2.Rng.State);
+            Assert.Equal(expectedNext, w2.Rng.NextUInt64());
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Load_PreRng_Save_Defaults_Seed_To_Fresh()
+    {
+        // Saves written before prereq #3 had no Rng fields. STJ defaults them to 0;
+        // loading must not corrupt the world's existing Rng state.
+        string path = Path.Combine(Path.GetTempPath(), $"prerng-{System.Guid.NewGuid()}.json");
+        File.WriteAllText(path, """
+        { "Version": 1, "Credits": 100, "ResourceCarry": 0, "NextEntityId": 1, "Buildings": [] }
+        """);
+        try
+        {
+            World w = TestWorlds.Fresh(credits: 0, seed: 99);
+            ulong rngBefore = w.Rng.State;
+            new WorldSerializer().Load(w, new ResourceSystem(), path);
+            Assert.Equal(100, w.Credits);
+            // No Rng state in the save → world's Rng state untouched.
+            Assert.Equal(rngBefore, w.Rng.State);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Load_Nonexistent_ReturnsFalse()
     {
         World w = TestWorlds.Fresh();
