@@ -64,16 +64,25 @@ The gameplay world and its primitives. No rendering. Minimal MG: uses `Vector2` 
 - `TileCoord`, `RectInt` — integer-space value types.
 - `Grid` — dimensions, tile size, occupancy bitmap; `CanPlace` / `Occupy` / `Free` / `Clear`.
 - `World` — grid + catalog + buildings + credits + entity id counter.
+- `PlayerId` — identifies a player throughout a match. Phase 2 has one local human + an optional dummy; the schema supports up to 10.
 - `GameRoot` — MonoGame `Game` subclass. Wiring + loop. The one class that pulls everything together.
+
+### `Conquerors.Commands`
+Data records describing every gameplay-mutating intent.
+- `Command` (abstract record) + sealed subclasses (currently `PlaceBuildingCommand`).
+- `CommandBuffer` — per-tick FIFO. Input layer enqueues; the processor drains.
+
+Depends only on `Core`. Systems own the *application* of commands; this module owns their shape.
 
 ### `Conquerors.Entities`
 - `Building(Id, DefinitionId, Tile)` — record; footprint computed from catalog.
 
 ### `Conquerors.Systems`
-Plain update logic. Take a `World` and inputs, mutate the world.
-- `CameraSystem` — pan / zoom / edge-scroll; toggles edge scroll on F2.
-- `ResourceSystem` — sum CreditsPerSecond across buildings; accumulate fractional credits across frames.
-- `PlacementSystem` — build-mode state machine; `Check` (pure) + `TryPlace` (mutating).
+Plain update logic. Take a `World` and inputs, mutate the world. Mutating systems are invoked via `CommandProcessor` (not called directly from `GameRoot`).
+- `CameraSystem` — pan / zoom / edge-scroll; toggles edge scroll on F2. (Camera is not gameplay state; this system is exempt from the command pipeline.)
+- `ResourceSystem` — sum CreditsPerSecond across buildings; accumulate fractional credits across frames. (Tick-driven, not command-driven.)
+- `PlacementSystem` — build-mode UI state + `Check` (pure) + `Apply(World, PlaceBuildingCommand)`.
+- `CommandProcessor` — drains a `CommandBuffer` and dispatches each command to the system that applies it.
 
 ### `Conquerors.Input`
 - `InputManager` — keyboard + mouse snapshots with previous-frame deltas (`WasKeyPressed`, `LeftClicked`, `ScrollDelta`).
@@ -116,7 +125,8 @@ Program.Main
         - Input.Poll
         - CameraSystem.Update + clamp
         - ResourceSystem.Update
-        - UpdatePlacement (B / 1 / 2 / LMB / RMB)
+        - UpdatePlacement (B / 1 / 2 / RMB toggles UI; LMB enqueues PlaceBuildingCommand)
+        - CommandProcessor.ProcessAll (drains buffer → systems mutate World)
         - UpdatePersistence (F5 / F9)
       Draw:
         - Clear
@@ -133,6 +143,7 @@ Program.Main
 | Grid occupancy bitmap         | `World.Grid` (private)          |
 | Resource fractional carry     | `ResourceSystem._carry`         |
 | Build mode + selected defn    | `PlacementSystem`               |
+| Pending commands (this tick)  | `CommandBuffer`                 |
 | Camera position + zoom        | `Camera2D`                      |
 | Edge scroll on/off            | `CameraSystem.EdgeScrollEnabled`|
 | FPS sampler window            | `FpsCounter`                    |

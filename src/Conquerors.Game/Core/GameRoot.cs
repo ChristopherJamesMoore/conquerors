@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using Conquerors.Commands;
 using Conquerors.Data;
 using Conquerors.Entities;
 using Conquerors.Input;
@@ -37,6 +38,8 @@ public sealed class GameRoot : Game
     private readonly CameraSystem _cameraSystem = new();
     private readonly ResourceSystem _resourceSystem = new();
     private readonly PlacementSystem _placementSystem = new(new[] { "collector", "barracks" });
+    private readonly CommandBuffer _commands = new();
+    private readonly CommandProcessor _commandProcessor;
     private readonly FpsCounter _fpsCounter = new();
     private readonly Stopwatch _frameStopwatch = new();
     private readonly WorldSerializer _serializer = new();
@@ -45,6 +48,7 @@ public sealed class GameRoot : Game
 
     public GameRoot()
     {
+        _commandProcessor = new CommandProcessor(_placementSystem);
         _graphics = new GraphicsDeviceManager(this)
         {
             PreferredBackBufferWidth = 1280,
@@ -104,6 +108,7 @@ public sealed class GameRoot : Game
         _camera.ClampTo(new Rectangle(0, 0, _world.Grid.PixelWidth, _world.Grid.PixelHeight));
         _resourceSystem.Update(_world, dt);
         UpdatePlacement();
+        _commandProcessor.ProcessAll(_world, _commands);
         UpdatePersistence();
 
         base.Update(gameTime);
@@ -151,7 +156,10 @@ public sealed class GameRoot : Game
         if (_input.LeftClicked)
         {
             TileCoord tile = MouseTile();
-            _placementSystem.TryPlace(_world, tile, out _);
+            if (_placementSystem.Check(_world, _placementSystem.SelectedDefinitionId, tile) == PlacementResult.Ok)
+            {
+                _commands.Enqueue(new PlaceBuildingCommand(PlayerId.Local, _placementSystem.SelectedDefinitionId, tile));
+            }
         }
     }
 
@@ -179,7 +187,7 @@ public sealed class GameRoot : Game
         if (_placementSystem.BuildMode)
         {
             TileCoord tile = MouseTile();
-            bool valid = _placementSystem.Check(_world, tile) == PlacementResult.Ok;
+            bool valid = _placementSystem.Check(_world, _placementSystem.SelectedDefinitionId, tile) == PlacementResult.Ok;
             _buildingRenderer.DrawGhost(_spriteBatch, _world, tile, _placementSystem.SelectedDefinitionId, valid);
         }
         _spriteBatch.End();

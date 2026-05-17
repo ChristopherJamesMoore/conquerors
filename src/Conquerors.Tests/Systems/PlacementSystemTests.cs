@@ -1,3 +1,4 @@
+using Conquerors.Commands;
 using Conquerors.Core;
 using Conquerors.Entities;
 using Conquerors.Systems;
@@ -8,64 +9,73 @@ public class PlacementSystemTests
 {
     private static PlacementSystem Sys() => new(new[] { "collector", "barracks" });
 
+    private static PlaceBuildingCommand Place(string id, int x, int y)
+        => new(PlayerId.Local, id, new TileCoord(x, y));
+
     [Fact]
-    public void TryPlace_WithoutBuildMode_Fails()
+    public void Apply_OffMap_Rejected()
     {
         World w = TestWorlds.Fresh();
         PlacementSystem p = Sys();
-        bool ok = p.TryPlace(w, new TileCoord(0, 0), out PlacementResult r);
-        Assert.False(ok);
-        Assert.Equal(PlacementResult.NotInBuildMode, r);
+        PlacementResult r = p.Apply(w, Place("collector", -1, 0));
+        Assert.Equal(PlacementResult.OffMap, r);
         Assert.Empty(w.Buildings);
     }
 
     [Fact]
-    public void TryPlace_OffMap_Fails()
-    {
-        World w = TestWorlds.Fresh();
-        PlacementSystem p = Sys();
-        p.EnterBuildMode();
-        bool ok = p.TryPlace(w, new TileCoord(-1, 0), out PlacementResult r);
-        Assert.False(ok);
-        Assert.Equal(PlacementResult.OffMap, r);
-    }
-
-    [Fact]
-    public void TryPlace_OnOccupied_Fails()
+    public void Apply_OnOccupied_Rejected()
     {
         World w = TestWorlds.Fresh();
         w.AddBuilding(new Building(w.NextId(), "hq", new TileCoord(5, 5)));
         PlacementSystem p = Sys();
-        p.EnterBuildMode();
-        bool ok = p.TryPlace(w, new TileCoord(5, 5), out PlacementResult r);
-        Assert.False(ok);
+        PlacementResult r = p.Apply(w, Place("collector", 5, 5));
         Assert.Equal(PlacementResult.Occupied, r);
     }
 
     [Fact]
-    public void TryPlace_InsufficientCredits_Fails()
+    public void Apply_InsufficientCredits_Rejected()
     {
         World w = TestWorlds.Fresh(credits: 50);
         PlacementSystem p = Sys();
-        p.EnterBuildMode();
-        bool ok = p.TryPlace(w, new TileCoord(0, 0), out PlacementResult r);
-        Assert.False(ok);
+        PlacementResult r = p.Apply(w, Place("collector", 0, 0));
         Assert.Equal(PlacementResult.InsufficientCredits, r);
         Assert.Equal(50, w.Credits);
+        Assert.Empty(w.Buildings);
     }
 
     [Fact]
-    public void TryPlace_Success_DeductsCost_AddsBuilding_OccupiesGrid()
+    public void Apply_Success_DeductsCost_AddsBuilding_OccupiesGrid()
     {
         World w = TestWorlds.Fresh(credits: 500);
         PlacementSystem p = Sys();
-        p.EnterBuildMode();
-        bool ok = p.TryPlace(w, new TileCoord(2, 2), out PlacementResult r);
-        Assert.True(ok);
+        PlacementResult r = p.Apply(w, Place("collector", 2, 2));
         Assert.Equal(PlacementResult.Ok, r);
         Assert.Equal(400, w.Credits);
         Assert.Single(w.Buildings);
         Assert.False(w.Grid.CanPlace(new RectInt(2, 2, 2, 2)));
+    }
+
+    [Fact]
+    public void Apply_IgnoresBuildModeFlag()
+    {
+        // Build mode is UI state. A well-formed command applies regardless — the input
+        // layer is what gates command emission on build mode.
+        World w = TestWorlds.Fresh(credits: 500);
+        PlacementSystem p = Sys();
+        Assert.False(p.BuildMode);
+        PlacementResult r = p.Apply(w, Place("collector", 2, 2));
+        Assert.Equal(PlacementResult.Ok, r);
+        Assert.Single(w.Buildings);
+    }
+
+    [Fact]
+    public void Check_TakesDefinitionId_Independent_Of_Selection()
+    {
+        World w = TestWorlds.Fresh(credits: 500);
+        PlacementSystem p = Sys();
+        Assert.Equal("collector", p.SelectedDefinitionId);
+        // Caller can check a different defn than the current selection (used by HUD/ghost).
+        Assert.Equal(PlacementResult.Ok, p.Check(w, "barracks", new TileCoord(0, 0)));
     }
 
     [Fact]

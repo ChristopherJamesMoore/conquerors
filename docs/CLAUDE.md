@@ -22,7 +22,8 @@ Input.Poll                              (snapshot keyboard / mouse)
   ├─► Camera2D.ClampTo                   (keep camera in world bounds)
   ├─► ResourceSystem.Update              (sum income, mutate World.Credits)
   ├─► (build mode key handling)          (toggles PlacementSystem, picks defn)
-  ├─► PlacementSystem.TryPlace           (validates + mutates World on click)
+  ├─► (LMB in build mode → Command)      (input translator enqueues PlaceBuildingCommand)
+  ├─► CommandProcessor.ProcessAll        (drains buffer → systems mutate World)
   └─► Persistence keys (F5 / F9)         (serializer reads/writes World+ResSys)
 
 Draw
@@ -35,6 +36,14 @@ Draw
 ```
 
 `World` is the single source of truth. Tests construct one directly (no MonoGame needed) — see `TestWorlds`.
+
+## Command stream (Phase 2 prereq #1)
+
+Every gameplay-mutating action is a `Command` record. The input layer (GameRoot) translates clicks/keys into commands and enqueues them on a `CommandBuffer`; `CommandProcessor.ProcessAll` drains the buffer each tick and dispatches to the owning system. **Systems never read input directly.** This is what makes lockstep MP and deterministic replays cheap in later phases — we can swap the input translator for a network-decoded bundle without touching the sim.
+
+`BuildMode` / `SelectedDefinitionId` on `PlacementSystem` are UI state — they gate command *emission*, not command *application*. `Apply(World, PlaceBuildingCommand)` validates from the command's own fields and is independent of any UI flag.
+
+When adding a new gameplay action: define a new `…Command` record under `Commands/`, add a case to `CommandProcessor.Apply`, and route the input that triggers it through `CommandBuffer.Enqueue`. Never call a mutating system method directly from `GameRoot.Update`.
 
 ## How to add a new building type
 
