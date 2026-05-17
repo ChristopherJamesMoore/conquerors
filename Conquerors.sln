@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{E851D395-A7BE-49D5-9993-10BD9EEF1F92}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conquerors.Game", "src\Conquerors.Game\Conquerors.Game.csproj", "{8C4FA90E-5047-495F-8912-74245DAD3147}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conquerors.Tests", "src\Conquerors.Tests\Conquerors.Tests.csproj", "{B84FB43F-4DAC-4BF7-8CF0-1DD56ABA5892}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8C4FA90E-5047-495F-8912-74245DAD3147}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8C4FA90E-5047-495F-8912-74245DAD3147}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8C4FA90E-5047-495F-8912-74245DAD3147}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8C4FA90E-5047-495F-8912-74245DAD3147}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B84FB43F-4DAC-4BF7-8CF0-1DD56ABA5892}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B84FB43F-4DAC-4BF7-8CF0-1DD56ABA5892}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B84FB43F-4DAC-4BF7-8CF0-1DD56ABA5892}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B84FB43F-4DAC-4BF7-8CF0-1DD56ABA5892}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{8C4FA90E-5047-495F-8912-74245DAD3147} = {E851D395-A7BE-49D5-9993-10BD9EEF1F92}
+		{B84FB43F-4DAC-4BF7-8CF0-1DD56ABA5892} = {E851D395-A7BE-49D5-9993-10BD9EEF1F92}
+	EndGlobalSection
+EndGlobal

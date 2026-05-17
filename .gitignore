@@ -1,0 +1,33 @@
+## .NET / build artifacts
+bin/
+obj/
+out/
+*.user
+*.suo
+*.userprefs
+*.binlog
+
+## Tool/IDE
+.vs/
+.idea/
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/settings.json
+.DS_Store
+
+## MonoGame content build
+Content/bin/
+Content/obj/
+
+## Tests / coverage
+TestResults/
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+
+## Local environment
+.env
+.env.local
+*.local.props
