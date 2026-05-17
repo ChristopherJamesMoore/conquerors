@@ -65,6 +65,7 @@ The gameplay world and its primitives. No rendering. Minimal MG: uses `Vector2` 
 - `Grid` — dimensions, tile size, occupancy bitmap; `CanPlace` / `Occupy` / `Free` / `Clear`.
 - `World` — grid + catalog + buildings + credits + entity id counter.
 - `PlayerId` — identifies a player throughout a match. Phase 2 has one local human + an optional dummy; the schema supports up to 10.
+- `SimClock` — fixed-timestep scheduler. `Advance(dt)` accumulates real seconds and returns whole sim ticks (20Hz) for the caller to step. Decouples sim from render — essential for deterministic lockstep MP.
 - `GameRoot` — MonoGame `Game` subclass. Wiring + loop. The one class that pulls everything together.
 
 ### `Conquerors.Commands`
@@ -121,13 +122,14 @@ Program.Main
         - new World(grid, catalog, 500 credits)
         - World.AddBuilding(HQ at centre)
         - camera.Position = grid centre
-      Update (60Hz fixed):
+      Update (per render frame, 60Hz fixed):
         - Input.Poll
         - CameraSystem.Update + clamp
-        - ResourceSystem.Update
         - UpdatePlacement (B / 1 / 2 / RMB toggles UI; LMB enqueues PlaceBuildingCommand)
-        - CommandProcessor.ProcessAll (drains buffer → systems mutate World)
         - UpdatePersistence (F5 / F9)
+        - SimClock.Advance(dt) → N tick steps; for each:
+            * ResourceSystem.Update (dt = 0.05s)
+            * CommandProcessor.ProcessAll (drains buffer → systems mutate World)
       Draw:
         - Clear
         - SpriteBatch.Begin(camera transform): grid → buildings → ghost
@@ -144,6 +146,7 @@ Program.Main
 | Resource fractional carry     | `ResourceSystem._carry`         |
 | Build mode + selected defn    | `PlacementSystem`               |
 | Pending commands (this tick)  | `CommandBuffer`                 |
+| Sim tick count + accumulator  | `SimClock`                      |
 | Camera position + zoom        | `Camera2D`                      |
 | Edge scroll on/off            | `CameraSystem.EdgeScrollEnabled`|
 | FPS sampler window            | `FpsCounter`                    |

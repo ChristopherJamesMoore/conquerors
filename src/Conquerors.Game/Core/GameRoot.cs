@@ -40,6 +40,7 @@ public sealed class GameRoot : Game
     private readonly PlacementSystem _placementSystem = new(new[] { "collector", "barracks" });
     private readonly CommandBuffer _commands = new();
     private readonly CommandProcessor _commandProcessor;
+    private readonly SimClock _simClock = new();
     private readonly FpsCounter _fpsCounter = new();
     private readonly Stopwatch _frameStopwatch = new();
     private readonly WorldSerializer _serializer = new();
@@ -103,15 +104,30 @@ public sealed class GameRoot : Game
             Exit();
         }
 
-        float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
-        _cameraSystem.Update(_camera, _input, dt, IsActive);
+        double dt = gameTime.ElapsedGameTime.TotalSeconds;
+
+        // Per-frame: input, camera, command emission. These run at render rate so
+        // the user sees no input lag and the camera stays smooth at high framerates.
+        _cameraSystem.Update(_camera, _input, (float)dt, IsActive);
         _camera.ClampTo(new Rectangle(0, 0, _world.Grid.PixelWidth, _world.Grid.PixelHeight));
-        _resourceSystem.Update(_world, dt);
         UpdatePlacement();
-        _commandProcessor.ProcessAll(_world, _commands);
         UpdatePersistence();
 
+        // Per-tick: sim systems advance in fixed 50ms steps so determinism is
+        // independent of the host's framerate. All world mutation happens here.
+        int steps = _simClock.Advance(dt);
+        for (int i = 0; i < steps; i++)
+        {
+            SimStep();
+        }
+
         base.Update(gameTime);
+    }
+
+    private void SimStep()
+    {
+        _resourceSystem.Update(_world, SimClock.TickDt);
+        _commandProcessor.ProcessAll(_world, _commands);
     }
 
     private void UpdatePersistence()

@@ -16,15 +16,18 @@ Three layers, top-down:
 ## Data flow per frame
 
 ```
-Input.Poll                              (snapshot keyboard / mouse)
-  │
-  ├─► CameraSystem.Update                (mutates Camera2D from input)
-  ├─► Camera2D.ClampTo                   (keep camera in world bounds)
-  ├─► ResourceSystem.Update              (sum income, mutate World.Credits)
-  ├─► (build mode key handling)          (toggles PlacementSystem, picks defn)
-  ├─► (LMB in build mode → Command)      (input translator enqueues PlaceBuildingCommand)
-  ├─► CommandProcessor.ProcessAll        (drains buffer → systems mutate World)
-  └─► Persistence keys (F5 / F9)         (serializer reads/writes World+ResSys)
+Per-frame (runs at render rate, 60+Hz):
+  Input.Poll                              (snapshot keyboard / mouse)
+  ├─► CameraSystem.Update                 (mutates Camera2D from input)
+  ├─► Camera2D.ClampTo                    (keep camera in world bounds)
+  ├─► (build mode key handling)           (toggles PlacementSystem, picks defn)
+  ├─► (LMB in build mode → Command)       (input translator enqueues PlaceBuildingCommand)
+  ├─► Persistence keys (F5 / F9)          (serializer reads/writes World+ResSys)
+  └─► SimClock.Advance(dt) → N            (returns whole sim ticks to run now)
+
+For each of N ticks (sim, fixed 50ms dt):
+  ├─► ResourceSystem.Update(world, 0.05)  (deterministic income tick)
+  └─► CommandProcessor.ProcessAll         (drains buffer → systems mutate World)
 
 Draw
   │ Begin SpriteBatch with camera transform
@@ -36,6 +39,14 @@ Draw
 ```
 
 `World` is the single source of truth. Tests construct one directly (no MonoGame needed) — see `TestWorlds`.
+
+## Sim tick (Phase 2 prereq #2)
+
+Render runs at the host's framerate; the simulation advances in fixed 50ms steps (`SimClock.TicksPerSecond = 20`). `GameRoot.Update` calls `SimClock.Advance(dt)`, which returns how many tick steps to execute. Each step runs `ResourceSystem.Update` (with constant `SimClock.TickDt`) and `CommandProcessor.ProcessAll`. Camera/input/render stay per-frame.
+
+Why fixed-step: peers in a lockstep MP match (Phase 4) must all step the same number of times with the same dt regardless of local framerate. Hard-coding this now means the gameplay logic we write in Phase 2/3 is already framerate-independent.
+
+`Advance` caps catch-up at `DefaultMaxStepsPerAdvance` (5) to prevent a spiral of death after long stalls (debugger break, GPU hang). Residual time stays in the accumulator and is consumed on subsequent calls.
 
 ## Command stream (Phase 2 prereq #1)
 
