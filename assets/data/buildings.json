@@ -1,0 +1,29 @@
+[
+  {
+    "Id": "hq",
+    "Name": "HQ",
+    "Cost": 0,
+    "Width": 3,
+    "Height": 3,
+    "CreditsPerSecond": 1.0,
+    "Color": { "R": 235, "G": 180, "B": 90 }
+  },
+  {
+    "Id": "collector",
+    "Name": "Collector",
+    "Cost": 100,
+    "Width": 2,
+    "Height": 2,
+    "CreditsPerSecond": 2.0,
+    "Color": { "R": 90, "G": 200, "B": 140 }
+  },
+  {
+    "Id": "barracks",
+    "Name": "Barracks",
+    "Cost": 200,
+    "Width": 3,
+    "Height": 2,
+    "CreditsPerSecond": 0.0,
+    "Color": { "R": 200, "G": 80, "B": 80 }
+  }
+]
