@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using System.IO;
 using Conquerors.Data;
 using Conquerors.Entities;
 using Conquerors.Input;
 using Conquerors.Rendering;
 using Conquerors.Systems;
+using Conquerors.UI;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -26,12 +28,16 @@ public sealed class GameRoot : Game
     private Pixel _pixel = null!;
     private GridRenderer _gridRenderer = null!;
     private BuildingRenderer _buildingRenderer = null!;
+    private Hud _hud = null!;
+    private SpriteFont _font = null!;
 
     private readonly InputManager _input = new();
     private readonly Camera2D _camera = new();
     private readonly CameraSystem _cameraSystem = new();
     private readonly ResourceSystem _resourceSystem = new();
     private readonly PlacementSystem _placementSystem = new(new[] { "collector", "barracks" });
+    private readonly FpsCounter _fpsCounter = new();
+    private readonly Stopwatch _frameStopwatch = new();
 
     private World _world = null!;
 
@@ -64,20 +70,22 @@ public sealed class GameRoot : Game
         _pixel = new Pixel(GraphicsDevice);
         _gridRenderer = new GridRenderer(_pixel.Texture);
         _buildingRenderer = new BuildingRenderer(_pixel.Texture);
+        _font = Content.Load<SpriteFont>("Default");
+        _hud = new Hud(_font, _pixel.Texture);
 
         string catalogPath = Path.Combine(System.AppContext.BaseDirectory, "assets", "data", "buildings.json");
         BuildingCatalog catalog = BuildingCatalog.LoadFromJson(catalogPath);
 
         Grid grid = new(GridWidthTiles, GridHeightTiles, TilePixels);
         _world = new World(grid, catalog, StartingCredits);
-
-        // Initial HQ centred on the grid
         TileCoord hqTile = new(GridWidthTiles / 2 - 1, GridHeightTiles / 2 - 1);
         _world.AddBuilding(new Building(_world.NextId(), "hq", hqTile));
 
         _camera.ViewportWidth = Window.ClientBounds.Width;
         _camera.ViewportHeight = Window.ClientBounds.Height;
         _camera.Position = new Vector2(grid.PixelWidth * 0.5f, grid.PixelHeight * 0.5f);
+
+        _frameStopwatch.Start();
     }
 
     protected override void Update(GameTime gameTime)
@@ -134,6 +142,9 @@ public sealed class GameRoot : Game
 
     protected override void Draw(GameTime gameTime)
     {
+        _fpsCounter.Tick(_frameStopwatch.Elapsed.TotalSeconds);
+        _frameStopwatch.Restart();
+
         GraphicsDevice.Clear(new Color(15, 18, 24));
 
         _spriteBatch.Begin(
@@ -149,6 +160,11 @@ public sealed class GameRoot : Game
             bool valid = _placementSystem.Check(_world, tile) == PlacementResult.Ok;
             _buildingRenderer.DrawGhost(_spriteBatch, _world, tile, _placementSystem.SelectedDefinitionId, valid);
         }
+        _spriteBatch.End();
+
+        _spriteBatch.Begin(sortMode: SpriteSortMode.Deferred, blendState: BlendState.AlphaBlend);
+        _hud.Draw(_spriteBatch, _world, _placementSystem, _cameraSystem, _fpsCounter.Fps,
+            _camera.ViewportWidth, _camera.ViewportHeight);
         _spriteBatch.End();
 
         base.Draw(gameTime);
