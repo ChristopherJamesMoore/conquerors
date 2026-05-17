@@ -31,6 +31,7 @@ public sealed class GameRoot : Game
     private readonly Camera2D _camera = new();
     private readonly CameraSystem _cameraSystem = new();
     private readonly ResourceSystem _resourceSystem = new();
+    private readonly PlacementSystem _placementSystem = new(new[] { "collector", "barracks" });
 
     private World _world = null!;
 
@@ -92,8 +93,43 @@ public sealed class GameRoot : Game
         _cameraSystem.Update(_camera, _input, dt, IsActive);
         _camera.ClampTo(new Rectangle(0, 0, _world.Grid.PixelWidth, _world.Grid.PixelHeight));
         _resourceSystem.Update(_world, dt);
+        UpdatePlacement();
 
         base.Update(gameTime);
+    }
+
+    private void UpdatePlacement()
+    {
+        if (_input.WasKeyPressed(Keys.B))
+        {
+            _placementSystem.ToggleBuildMode();
+        }
+        if (!_placementSystem.BuildMode)
+        {
+            return;
+        }
+
+        if (_input.WasKeyPressed(Keys.D1)) _placementSystem.SelectByIndex(0);
+        if (_input.WasKeyPressed(Keys.D2)) _placementSystem.SelectByIndex(1);
+
+        if (_input.RightClicked)
+        {
+            _placementSystem.ExitBuildMode();
+            return;
+        }
+
+        if (_input.LeftClicked)
+        {
+            TileCoord tile = MouseTile();
+            _placementSystem.TryPlace(_world, tile, out _);
+        }
+    }
+
+    private TileCoord MouseTile()
+    {
+        Vector2 screen = new(_input.MousePosition.X, _input.MousePosition.Y);
+        Vector2 world = _camera.ScreenToWorld(screen);
+        return _world.Grid.WorldToTile(world);
     }
 
     protected override void Draw(GameTime gameTime)
@@ -107,6 +143,12 @@ public sealed class GameRoot : Game
             transformMatrix: _camera.GetViewMatrix());
         _gridRenderer.Draw(_spriteBatch, _world.Grid, _camera);
         _buildingRenderer.Draw(_spriteBatch, _world);
+        if (_placementSystem.BuildMode)
+        {
+            TileCoord tile = MouseTile();
+            bool valid = _placementSystem.Check(_world, tile) == PlacementResult.Ok;
+            _buildingRenderer.DrawGhost(_spriteBatch, _world, tile, _placementSystem.SelectedDefinitionId, valid);
+        }
         _spriteBatch.End();
 
         base.Draw(gameTime);
