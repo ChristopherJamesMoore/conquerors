@@ -90,6 +90,8 @@ public sealed class Grid
         }
     }
 
+    public void Clear() => System.Array.Clear(_occupied, 0, _occupied.Length);
+
     public Vector2 TileToWorld(TileCoord t) => new(t.X * TileSize, t.Y * TileSize);
 
     public TileCoord WorldToTile(Vector2 world) =>

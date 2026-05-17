@@ -3,6 +3,7 @@ using System.IO;
 using Conquerors.Data;
 using Conquerors.Entities;
 using Conquerors.Input;
+using Conquerors.Persistence;
 using Conquerors.Rendering;
 using Conquerors.Systems;
 using Conquerors.UI;
@@ -38,6 +39,7 @@ public sealed class GameRoot : Game
     private readonly PlacementSystem _placementSystem = new(new[] { "collector", "barracks" });
     private readonly FpsCounter _fpsCounter = new();
     private readonly Stopwatch _frameStopwatch = new();
+    private readonly WorldSerializer _serializer = new();
 
     private World _world = null!;
 
@@ -102,8 +104,28 @@ public sealed class GameRoot : Game
         _camera.ClampTo(new Rectangle(0, 0, _world.Grid.PixelWidth, _world.Grid.PixelHeight));
         _resourceSystem.Update(_world, dt);
         UpdatePlacement();
+        UpdatePersistence();
 
         base.Update(gameTime);
+    }
+
+    private void UpdatePersistence()
+    {
+        if (_input.WasKeyPressed(Keys.F5))
+        {
+            try { _serializer.Save(_world, _resourceSystem, SavePaths.DefaultSaveFile); }
+            catch (System.Exception ex) { System.Console.Error.WriteLine($"save failed: {ex.Message}"); }
+        }
+        if (_input.WasKeyPressed(Keys.F9))
+        {
+            try
+            {
+                bool loaded = _serializer.Load(_world, _resourceSystem, SavePaths.DefaultSaveFile);
+                if (!loaded) System.Console.Error.WriteLine($"no save at {SavePaths.DefaultSaveFile}");
+                _placementSystem.ExitBuildMode();
+            }
+            catch (System.Exception ex) { System.Console.Error.WriteLine($"load failed: {ex.Message}"); }
+        }
     }
 
     private void UpdatePlacement()
