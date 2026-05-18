@@ -64,6 +64,21 @@ Why fixed-step: peers in a lockstep MP match (Phase 4) must all step the same nu
 
 `Advance` caps catch-up at `DefaultMaxStepsPerAdvance` (5) to prevent a spiral of death after long stalls (debugger break, GPU hang). Residual time stays in the accumulator and is consumed on subsequent calls.
 
+## Determinism discipline (Phase 2 prereq #5)
+
+Lockstep MP (Phase 4) requires peers to compute identical world state from identical inputs. The full rule set lives in `docs/ARCHITECTURE-MP.md §Determinism`. The short list of things **forbidden in sim code** (`Commands/`, `Core/`, `Data/`, `Entities/`, `Systems/`):
+
+- Transcendentals: `Math.{Sin,Cos,Tan,Atan,Atan2,Asin,Acos,Exp,Log,Pow}` and `MathF.*` — cross-CPU/runtime variance.
+- Unseeded RNG: `Random.Shared`, `new Random(...)`. Use `World.Rng` (`MatchRng`).
+- Wall clocks: `DateTime.Now`, `DateTime.UtcNow`, `Stopwatch`.
+- Allocation-derived ids: `Guid.NewGuid`. Use `World.NextId()`.
+
+`DeterminismDisciplineTests.Sim_Code_Contains_No_Forbidden_APIs` is the enforcement layer — a source scanner that walks the sim subdirs and fails the build on any forbidden token. It strips `//` and `/* */` comments and ignores `using` directives so the rule reads as "tokens in live code." `GameRoot.cs` is exempt (MonoGame wiring layer — `Stopwatch` powers the FPS counter, none of its state is sim state).
+
+This is intentionally line-scanning, not Roslyn-analyser-based. A real analyser is the longer-term home, but the scanner is good enough today and ships zero infrastructure cost. To exempt a new wiring file, add its basename to `ExemptFiles` and justify the exemption in a comment.
+
+Presentation code (`Rendering/`, `UI/`, `Input/`, `Persistence/`) is **not** scanned — it can use floats, clocks, system RNG freely. The rule is: anything that writes to `World` follows determinism discipline; anything that only reads `World` does not.
+
 ## Command stream (Phase 2 prereq #1)
 
 Every gameplay-mutating action is a `Command` record. The input layer (GameRoot) translates clicks/keys into commands and enqueues them on a `CommandBuffer`; `CommandProcessor.ProcessAll` drains the buffer each tick and dispatches to the owning system. **Systems never read input directly.** This is what makes lockstep MP and deterministic replays cheap in later phases — we can swap the input translator for a network-decoded bundle without touching the sim.

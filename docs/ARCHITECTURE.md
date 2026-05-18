@@ -110,6 +110,8 @@ MG-aware. Read-only on world state.
 ### `Conquerors.Tests` (project)
 xUnit. Each system has a tests file under a matching subfolder. Tests construct a `World` via `TestWorlds.Fresh()`; they don't spin up MonoGame.
 
+`Determinism/DeterminismDisciplineTests` is the source-scanning enforcement for the determinism rules in `ARCHITECTURE-MP.md`. It walks `Conquerors.Game/{Commands,Core,Data,Entities,Systems}` and fails the build if any file mentions a forbidden API (transcendentals, wall clocks, unseeded RNG, `Guid.NewGuid`). `GameRoot.cs` is exempt — it's the wiring layer, not sim state.
+
 ## Lifecycle
 
 ```
