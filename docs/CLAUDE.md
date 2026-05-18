@@ -40,6 +40,16 @@ Draw
 
 `World` is the single source of truth. Tests construct one directly (no MonoGame needed) — see `TestWorlds`.
 
+## PlayerId & entity ownership (Phase 2 prereq #4)
+
+Every gameplay entity that can be owned is owned. `Building.Owner` is a `PlayerId`. The world holds a `Players` list of `Player(Id, Name, Team, Color)` records — humans and bots share this type; the sim doesn't distinguish them.
+
+When applying a `PlaceBuildingCommand`, `PlacementSystem` copies `command.Issuer` onto the new `Building.Owner`. The save format round-trips both the player table and each building's owner.
+
+**Not yet per-player:** `World.Credits` and `ResourceSystem`'s summed income remain global. Phase 2 has one human; the optional dummy player (no controller yet) builds nothing. Per-player economy comes when a second human player exists (P4 lockstep) or when bots start placing buildings (P3).
+
+When the renderer becomes 3D, building/unit tint should sample `Player.Color`; the data is here, the renderer change is parked alongside the 3D pivot.
+
 ## Seeded RNG (Phase 2 prereq #3)
 
 `World.Rng` (`MatchRng`) is the single source of gameplay randomness. It uses xorshift64* with a SplitMix64 seed finalizer — chosen for stability across .NET versions and architectures. **Never call `Random.Shared` or `new Random()` from sim code.** Saves persist `Rng.Seed` (audit) and `Rng.State` (resume), so reloading a mid-match save continues the RNG sequence exactly where it stopped.

@@ -26,7 +26,12 @@ public sealed class WorldSerializer
         List<BuildingSave> buildings = new(world.Buildings.Count);
         foreach (Building b in world.Buildings)
         {
-            buildings.Add(new BuildingSave(b.Id, b.DefinitionId, b.Tile.X, b.Tile.Y));
+            buildings.Add(new BuildingSave(b.Id, b.DefinitionId, b.Tile.X, b.Tile.Y, b.Owner.Value));
+        }
+        List<PlayerSave> players = new(world.Players.Count);
+        foreach (Player p in world.Players)
+        {
+            players.Add(new PlayerSave(p.Id.Value, p.Name, p.Team.Value, p.Color));
         }
         SaveData data = new(
             CurrentVersion,
@@ -35,7 +40,8 @@ public sealed class WorldSerializer
             world.PeekNextId(),
             buildings,
             world.Rng.Seed,
-            world.Rng.State);
+            world.Rng.State,
+            players);
 
         string? dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
@@ -63,6 +69,7 @@ public sealed class WorldSerializer
 
         world.Buildings.Clear();
         world.Grid.Clear();
+        world.Players.Clear();
         world.Credits = data.Credits;
         resources.SetCarry(data.ResourceCarry);
         // RngState is the resume-point; Seed is metadata. Old (pre-rng) saves omit
@@ -71,6 +78,13 @@ public sealed class WorldSerializer
         {
             world.Rng.SetState(data.RngState);
         }
+        if (data.Players is { Count: > 0 })
+        {
+            foreach (PlayerSave ps in data.Players)
+            {
+                world.AddPlayer(new Player(new PlayerId(ps.Id), ps.Name, new TeamId(ps.Team), ps.Color));
+            }
+        }
         foreach (BuildingSave bs in data.Buildings)
         {
             if (!world.Catalog.Contains(bs.DefinitionId))
@@ -78,7 +92,7 @@ public sealed class WorldSerializer
                 throw new InvalidDataException(
                     $"save references unknown building '{bs.DefinitionId}'");
             }
-            world.AddBuilding(new Building(bs.Id, bs.DefinitionId, new TileCoord(bs.X, bs.Y)));
+            world.AddBuilding(new Building(bs.Id, bs.DefinitionId, new TileCoord(bs.X, bs.Y), new PlayerId(bs.Owner)));
         }
         world.SetNextId(data.NextEntityId);
         return true;

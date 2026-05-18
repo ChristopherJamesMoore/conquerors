@@ -12,8 +12,8 @@ public class WorldSerializerTests
     public void RoundTrip_PreservesState()
     {
         World w = TestWorlds.Fresh(credits: 777);
-        w.AddBuilding(new Building(w.NextId(), "hq", new TileCoord(0, 0)));
-        w.AddBuilding(new Building(w.NextId(), "collector", new TileCoord(5, 5)));
+        w.AddBuilding(new Building(w.NextId(), "hq", new TileCoord(0, 0), PlayerId.Local));
+        w.AddBuilding(new Building(w.NextId(), "collector", new TileCoord(5, 5), PlayerId.Local));
         ResourceSystem rs = new();
         rs.SetCarry(0.33);
 
@@ -38,6 +38,36 @@ public class WorldSerializerTests
             // next id continued past max:
             int next = w2.NextId();
             Assert.True(next > 2);
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void RoundTrip_PreservesPlayers_And_BuildingOwners()
+    {
+        World w = TestWorlds.Fresh(credits: 0);
+        // TestWorlds.Fresh already added PlayerId.Local; add a second.
+        PlayerId other = new(2);
+        w.AddPlayer(new Conquerors.Core.Player(other, "Dummy", new Conquerors.Core.TeamId(1), new Conquerors.Data.ColorRgb(200, 60, 60)));
+        w.AddBuilding(new Building(w.NextId(), "hq", new TileCoord(0, 0), PlayerId.Local));
+        w.AddBuilding(new Building(w.NextId(), "collector", new TileCoord(5, 5), other));
+
+        string path = Path.Combine(Path.GetTempPath(), $"conquerors-owner-{System.Guid.NewGuid()}.json");
+        try
+        {
+            new WorldSerializer().Save(w, new ResourceSystem(), path);
+
+            World w2 = TestWorlds.Fresh(credits: 0);
+            new WorldSerializer().Load(w2, new ResourceSystem(), path);
+
+            Assert.Equal(2, w2.Players.Count);
+            Assert.NotNull(w2.FindPlayer(PlayerId.Local));
+            Assert.Equal("Dummy", w2.FindPlayer(other)!.Name);
+            Assert.Equal(PlayerId.Local, w2.Buildings[0].Owner);
+            Assert.Equal(other, w2.Buildings[1].Owner);
         }
         finally
         {

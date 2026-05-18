@@ -26,7 +26,7 @@ public class PlacementSystemTests
     public void Apply_OnOccupied_Rejected()
     {
         World w = TestWorlds.Fresh();
-        w.AddBuilding(new Building(w.NextId(), "hq", new TileCoord(5, 5)));
+        w.AddBuilding(new Building(w.NextId(), "hq", new TileCoord(5, 5), PlayerId.Local));
         PlacementSystem p = Sys();
         PlacementResult r = p.Apply(w, Place("collector", 5, 5));
         Assert.Equal(PlacementResult.Occupied, r);
@@ -53,6 +53,19 @@ public class PlacementSystemTests
         Assert.Equal(400, w.Credits);
         Assert.Single(w.Buildings);
         Assert.False(w.Grid.CanPlace(new RectInt(2, 2, 2, 2)));
+    }
+
+    [Fact]
+    public void Apply_Sets_Owner_From_Command_Issuer()
+    {
+        World w = TestWorlds.Fresh(credits: 500);
+        // Register a second player so we can place on their behalf.
+        PlayerId other = new(7);
+        w.AddPlayer(new Conquerors.Core.Player(other, "Other", Conquerors.Core.TeamId.Solo, new Conquerors.Data.ColorRgb(200, 60, 60)));
+        PlacementSystem p = Sys();
+        PlacementResult r = p.Apply(w, new PlaceBuildingCommand(other, "collector", new TileCoord(2, 2)));
+        Assert.Equal(PlacementResult.Ok, r);
+        Assert.Equal(other, w.Buildings[0].Owner);
     }
 
     [Fact]

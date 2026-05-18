@@ -65,6 +65,8 @@ The gameplay world and its primitives. No rendering. Minimal MG: uses `Vector2` 
 - `Grid` — dimensions, tile size, occupancy bitmap; `CanPlace` / `Occupy` / `Free` / `Clear`.
 - `World` — grid + catalog + buildings + credits + entity id counter.
 - `PlayerId` — identifies a player throughout a match. Phase 2 has one local human + an optional dummy; the schema supports up to 10.
+- `TeamId` — independent of player count: 5v5 has two teams of five, FFA has N teams of one. Phase 2 uses `TeamId.Solo` only.
+- `Player` — per-match record of `(PlayerId, Name, TeamId, ColorRgb)`. Held in `World.Players`. Buildings/units reference owners by `PlayerId`, not by `Player` instance (saves are id-stable, instances aren't).
 - `SimClock` — fixed-timestep scheduler. `Advance(dt)` accumulates real seconds and returns whole sim ticks (20Hz) for the caller to step. Decouples sim from render — essential for deterministic lockstep MP.
 - `MatchRng` — per-match xorshift64* PRNG seeded at world construction. The only sanctioned source of gameplay randomness; stable across .NET versions and architectures. `Rng` is owned by `World`; saves persist seed + state for resumeable matches.
 - `GameRoot` — MonoGame `Game` subclass. Wiring + loop. The one class that pulls everything together.
@@ -77,7 +79,7 @@ Data records describing every gameplay-mutating intent.
 Depends only on `Core`. Systems own the *application* of commands; this module owns their shape.
 
 ### `Conquerors.Entities`
-- `Building(Id, DefinitionId, Tile)` — record; footprint computed from catalog.
+- `Building(Id, DefinitionId, Tile, Owner)` — record; footprint computed from catalog; `Owner` is a `PlayerId`.
 
 ### `Conquerors.Systems`
 Plain update logic. Take a `World` and inputs, mutate the world. Mutating systems are invoked via `CommandProcessor` (not called directly from `GameRoot`).
@@ -149,9 +151,10 @@ Program.Main
 | Pending commands (this tick)  | `CommandBuffer`                 |
 | Sim tick count + accumulator  | `SimClock`                      |
 | Match RNG seed + state        | `World.Rng` (`MatchRng`)        |
+| Player table                  | `World.Players`                 |
 | Camera position + zoom        | `Camera2D`                      |
 | Edge scroll on/off            | `CameraSystem.EdgeScrollEnabled`|
 | FPS sampler window            | `FpsCounter`                    |
 | Save path                     | `SavePaths` (computed)          |
 
-Persistence saves: Credits, ResourceCarry, NextEntityId, Buildings, Rng seed + state. Camera state and edge-scroll toggle are session-only by design.
+Persistence saves: Credits, ResourceCarry, NextEntityId, Buildings (with Owner), Rng seed + state, Players. Camera state and edge-scroll toggle are session-only by design.

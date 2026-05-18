@@ -85,7 +85,7 @@ public sealed class PlacementSystem
         }
         BuildingData def = world.Catalog.Get(command.DefinitionId);
         world.Credits -= def.Cost;
-        world.AddBuilding(new Building(world.NextId(), def.Id, command.Tile));
+        world.AddBuilding(new Building(world.NextId(), def.Id, command.Tile, command.Issuer));
         return PlacementResult.Ok;
     }
 }

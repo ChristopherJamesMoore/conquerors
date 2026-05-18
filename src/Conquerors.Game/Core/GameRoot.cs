@@ -86,8 +86,9 @@ public sealed class GameRoot : Game
 
         Grid grid = new(GridWidthTiles, GridHeightTiles, TilePixels);
         _world = new World(grid, catalog, StartingCredits, SandboxSeed);
+        _world.AddPlayer(new Player(PlayerId.Local, "Player 1", TeamId.Solo, new ColorRgb(80, 150, 240)));
         TileCoord hqTile = new(GridWidthTiles / 2 - 1, GridHeightTiles / 2 - 1);
-        _world.AddBuilding(new Building(_world.NextId(), "hq", hqTile));
+        _world.AddBuilding(new Building(_world.NextId(), "hq", hqTile, PlayerId.Local));
 
         _camera.ViewportWidth = Window.ClientBounds.Width;
         _camera.ViewportHeight = Window.ClientBounds.Height;

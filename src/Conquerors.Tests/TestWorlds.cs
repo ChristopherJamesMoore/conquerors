@@ -13,9 +13,12 @@ internal static class TestWorlds
         new BuildingData("barracks", "Barracks", Cost: 200, Width: 3, Height: 2, CreditsPerSecond: 0.0f, new ColorRgb(200, 80, 80)),
     });
 
+    /// <summary>Fresh world with a single local player already registered.</summary>
     public static World Fresh(int credits = 500, int gridSize = 16, ulong seed = 0xDEADBEEFUL)
     {
         Grid grid = new(gridSize, gridSize, tileSize: 32);
-        return new World(grid, Catalog(), credits, seed);
+        World w = new(grid, Catalog(), credits, seed);
+        w.AddPlayer(new Player(PlayerId.Local, "TestPlayer", TeamId.Solo, new ColorRgb(80, 150, 240)));
+        return w;
     }
 }

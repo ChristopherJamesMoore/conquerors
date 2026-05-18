@@ -12,6 +12,7 @@ public sealed class World
 {
     public Grid Grid { get; }
     public BuildingCatalog Catalog { get; }
+    public List<Player> Players { get; }
     public List<Building> Buildings { get; }
     public int Credits { get; set; }
     public MatchRng Rng { get; }
@@ -22,10 +23,29 @@ public sealed class World
     {
         Grid = grid;
         Catalog = catalog;
+        Players = new List<Player>();
         Buildings = new List<Building>();
         Credits = startingCredits;
         Rng = new MatchRng(rngSeed);
         _nextEntityId = 1;
+    }
+
+    public Player? FindPlayer(PlayerId id)
+    {
+        foreach (Player p in Players)
+        {
+            if (p.Id == id) return p;
+        }
+        return null;
+    }
+
+    public void AddPlayer(Player player)
+    {
+        if (FindPlayer(player.Id) is not null)
+        {
+            throw new System.ArgumentException($"player {player.Id.Value} already exists", nameof(player));
+        }
+        Players.Add(player);
     }
 
     public int NextId() => _nextEntityId++;
