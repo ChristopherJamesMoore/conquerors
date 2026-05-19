@@ -15,8 +15,8 @@ This is the structural map. For conventions and how-to-extend, read `CLAUDE.md` 
         ▼                     ▼  ▼  ▼  ▼                   ▼
    ┌────────┐     ┌─────────────────────┐     ┌──────────────────┐
    │ Input  │     │     Rendering       │     │     UI (HUD)     │
-   │ (poll) │     │ Camera2D, Pixel,    │     │ Font + panels    │
-   └────────┘     │ Grid/Building rend. │     └──────────────────┘
+   │ (poll) │     │ RtsCamera3D + ctrl, │     │ Font + panels    │
+   └────────┘     │ Grid/Building 3D    │     └──────────────────┘
         │         └─────────────────────┘
         │                  │
         │                  ▼ reads
@@ -82,8 +82,7 @@ Depends only on `Core`. Systems own the *application* of commands; this module o
 - `Building(Id, DefinitionId, Tile, Owner)` — record; footprint computed from catalog; `Owner` is a `PlayerId`.
 
 ### `Conquerors.Systems`
-Plain update logic. Take a `World` and inputs, mutate the world. Mutating systems are invoked via `CommandProcessor` (not called directly from `GameRoot`).
-- `CameraSystem` — pan / zoom / edge-scroll; toggles edge scroll on F2. (Camera is not gameplay state; this system is exempt from the command pipeline.)
+Plain update logic. Take a `World` and inputs, mutate the world. Mutating systems are invoked via `CommandProcessor` (not called directly from `GameRoot`). Camera lives in `Rendering/` because it never writes to `World`.
 - `ResourceSystem` — sum CreditsPerSecond across buildings; accumulate fractional credits across frames. (Tick-driven, not command-driven.)
 - `PlacementSystem` — build-mode UI state + `Check` (pure) + `Apply(World, PlaceBuildingCommand)`.
 - `CommandProcessor` — drains a `CommandBuffer` and dispatches each command to the system that applies it.
@@ -92,11 +91,13 @@ Plain update logic. Take a `World` and inputs, mutate the world. Mutating system
 - `InputManager` — keyboard + mouse snapshots with previous-frame deltas (`WasKeyPressed`, `LeftClicked`, `ScrollDelta`).
 
 ### `Conquerors.Rendering`
-MG-aware. Read-only on world state.
-- `Camera2D` — view matrix, screen↔world transforms, clamp.
-- `Pixel` — 1×1 white `Texture2D` used as a tintable quad source.
-- `GridRenderer` — view-culled checkerboard.
-- `BuildingRenderer` — placed buildings + ghost preview.
+MG-aware. Read-only on world state. 3D scene; one world unit = one tile, Y is up.
+- `RtsCamera3D` — orbit camera around a ground target; yaw/pitch/distance + `View`/`Projection` matrices + `ScreenToGround` ray pick.
+- `RtsCameraController` — drives the camera from input (WASD pan, RMB drag rotate, scroll zoom, edge-scroll toggle).
+- `PrimitiveRenderer` — owns a `BasicEffect` and a unit-cube mesh; helpers for `DrawCube`, `DrawGroundQuad`, `DrawLines`.
+- `GridRenderer3D` — ground plane + grid lines.
+- `BuildingRenderer3D` — placed buildings + ghost preview as coloured cubes (height per building id).
+- `Pixel` — 1×1 white `Texture2D` retained for HUD backdrops (SpriteBatch).
 
 ### `Conquerors.UI`
 - `FpsCounter` — windowed wall-clock fps.
@@ -119,25 +120,27 @@ Program.Main
   → new GameRoot()
       LoadContent:
         - new SpriteBatch
-        - new Pixel (1×1 white)
-        - new GridRenderer, BuildingRenderer, Hud
+        - new Pixel (1×1 white, for HUD backdrops)
+        - new PrimitiveRenderer (BasicEffect + unit cube)
+        - new GridRenderer3D, BuildingRenderer3D, Hud
         - Content.Load<SpriteFont>("Default")
         - BuildingCatalog.LoadFromJson(assets/data/buildings.json)
         - new Grid(64,64,32)
-        - new World(grid, catalog, 500 credits)
+        - new World(grid, catalog, 500 credits, SandboxSeed)
         - World.AddBuilding(HQ at centre)
-        - camera.Position = grid centre
+        - camera.Target = grid centre
       Update (per render frame, 60Hz fixed):
         - Input.Poll
-        - CameraSystem.Update + clamp
+        - RtsCameraController.Update + ClampTargetTo
         - UpdatePlacement (B / 1 / 2 / RMB toggles UI; LMB enqueues PlaceBuildingCommand)
         - UpdatePersistence (F5 / F9)
         - SimClock.Advance(dt) → N tick steps; for each:
             * ResourceSystem.Update (dt = 0.05s)
             * CommandProcessor.ProcessAll (drains buffer → systems mutate World)
       Draw:
-        - Clear
-        - SpriteBatch.Begin(camera transform): grid → buildings → ghost
+        - Clear; configure 3D pipeline (depth on, CullCCW)
+        - PrimitiveRenderer.SetCamera(View, Projection)
+        - GridRenderer3D, BuildingRenderer3D (placed + ghost)
         - SpriteBatch.Begin(identity): HUD
 ```
 
@@ -154,8 +157,8 @@ Program.Main
 | Sim tick count + accumulator  | `SimClock`                      |
 | Match RNG seed + state        | `World.Rng` (`MatchRng`)        |
 | Player table                  | `World.Players`                 |
-| Camera position + zoom        | `Camera2D`                      |
-| Edge scroll on/off            | `CameraSystem.EdgeScrollEnabled`|
+| Camera target / yaw / pitch / distance | `RtsCamera3D`          |
+| Edge scroll on/off            | `RtsCameraController.EdgeScrollEnabled`|
 | FPS sampler window            | `FpsCounter`                    |
 | Save path                     | `SavePaths` (computed)          |
 

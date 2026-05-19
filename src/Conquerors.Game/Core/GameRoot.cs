@@ -29,14 +29,15 @@ public sealed class GameRoot : Game
     private readonly GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch = null!;
     private Pixel _pixel = null!;
-    private GridRenderer _gridRenderer = null!;
-    private BuildingRenderer _buildingRenderer = null!;
+    private PrimitiveRenderer _primitives = null!;
+    private GridRenderer3D _gridRenderer = null!;
+    private BuildingRenderer3D _buildingRenderer = null!;
     private Hud _hud = null!;
     private SpriteFont _font = null!;
 
     private readonly InputManager _input = new();
-    private readonly Camera2D _camera = new();
-    private readonly CameraSystem _cameraSystem = new();
+    private readonly RtsCamera3D _camera = new();
+    private readonly RtsCameraController _cameraController = new();
     private readonly ResourceSystem _resourceSystem = new();
     private readonly PlacementSystem _placementSystem = new(new[] { "collector", "barracks" });
     private readonly CommandBuffer _commands = new();
@@ -76,8 +77,9 @@ public sealed class GameRoot : Game
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _pixel = new Pixel(GraphicsDevice);
-        _gridRenderer = new GridRenderer(_pixel.Texture);
-        _buildingRenderer = new BuildingRenderer(_pixel.Texture);
+        _primitives = new PrimitiveRenderer(GraphicsDevice);
+        _gridRenderer = new GridRenderer3D();
+        _buildingRenderer = new BuildingRenderer3D();
         _font = Content.Load<SpriteFont>("Default");
         _hud = new Hud(_font, _pixel.Texture);
 
@@ -92,7 +94,7 @@ public sealed class GameRoot : Game
 
         _camera.ViewportWidth = Window.ClientBounds.Width;
         _camera.ViewportHeight = Window.ClientBounds.Height;
-        _camera.Position = new Vector2(grid.PixelWidth * 0.5f, grid.PixelHeight * 0.5f);
+        _camera.Target = new Vector3(grid.Width * 0.5f, 0f, grid.Height * 0.5f);
 
         _frameStopwatch.Start();
     }
@@ -110,8 +112,8 @@ public sealed class GameRoot : Game
 
         // Per-frame: input, camera, command emission. These run at render rate so
         // the user sees no input lag and the camera stays smooth at high framerates.
-        _cameraSystem.Update(_camera, _input, (float)dt, IsActive);
-        _camera.ClampTo(new Rectangle(0, 0, _world.Grid.PixelWidth, _world.Grid.PixelHeight));
+        _cameraController.Update(_camera, _input, (float)dt, IsActive);
+        _camera.ClampTargetTo(0f, 0f, _world.Grid.Width, _world.Grid.Height);
         UpdatePlacement();
         UpdatePersistence();
 
@@ -171,9 +173,8 @@ public sealed class GameRoot : Game
             return;
         }
 
-        if (_input.LeftClicked)
+        if (_input.LeftClicked && TryMouseTile(out TileCoord tile))
         {
-            TileCoord tile = MouseTile();
             if (_placementSystem.Check(_world, _placementSystem.SelectedDefinitionId, tile) == PlacementResult.Ok)
             {
                 _commands.Enqueue(new PlaceBuildingCommand(PlayerId.Local, _placementSystem.SelectedDefinitionId, tile));
@@ -181,11 +182,22 @@ public sealed class GameRoot : Game
         }
     }
 
-    private TileCoord MouseTile()
+    private bool TryMouseTile(out TileCoord tile)
     {
-        Vector2 screen = new(_input.MousePosition.X, _input.MousePosition.Y);
-        Vector2 world = _camera.ScreenToWorld(screen);
-        return _world.Grid.WorldToTile(world);
+        if (!_camera.ScreenToGround(_input.MousePosition, out Vector3 hit))
+        {
+            tile = default;
+            return false;
+        }
+        int x = (int)System.Math.Floor(hit.X);
+        int y = (int)System.Math.Floor(hit.Z);
+        if (x < 0 || y < 0 || x >= _world.Grid.Width || y >= _world.Grid.Height)
+        {
+            tile = default;
+            return false;
+        }
+        tile = new TileCoord(x, y);
+        return true;
     }
 
     protected override void Draw(GameTime gameTime)
@@ -194,24 +206,21 @@ public sealed class GameRoot : Game
         _frameStopwatch.Restart();
 
         GraphicsDevice.Clear(new Color(15, 18, 24));
+        GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+        GraphicsDevice.BlendState = BlendState.NonPremultiplied;
+        GraphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
 
-        _spriteBatch.Begin(
-            sortMode: SpriteSortMode.Deferred,
-            blendState: BlendState.AlphaBlend,
-            samplerState: SamplerState.PointClamp,
-            transformMatrix: _camera.GetViewMatrix());
-        _gridRenderer.Draw(_spriteBatch, _world.Grid, _camera);
-        _buildingRenderer.Draw(_spriteBatch, _world);
-        if (_placementSystem.BuildMode)
+        _primitives.SetCamera(_camera.View, _camera.Projection);
+        _gridRenderer.Draw(_primitives, _world.Grid);
+        _buildingRenderer.Draw(_primitives, _world);
+        if (_placementSystem.BuildMode && TryMouseTile(out TileCoord ghostTile))
         {
-            TileCoord tile = MouseTile();
-            bool valid = _placementSystem.Check(_world, _placementSystem.SelectedDefinitionId, tile) == PlacementResult.Ok;
-            _buildingRenderer.DrawGhost(_spriteBatch, _world, tile, _placementSystem.SelectedDefinitionId, valid);
+            bool valid = _placementSystem.Check(_world, _placementSystem.SelectedDefinitionId, ghostTile) == PlacementResult.Ok;
+            _buildingRenderer.DrawGhost(_primitives, _world, ghostTile, _placementSystem.SelectedDefinitionId, valid);
         }
-        _spriteBatch.End();
 
         _spriteBatch.Begin(sortMode: SpriteSortMode.Deferred, blendState: BlendState.AlphaBlend);
-        _hud.Draw(_spriteBatch, _world, _placementSystem, _cameraSystem, _fpsCounter.Fps,
+        _hud.Draw(_spriteBatch, _world, _placementSystem, _cameraController, _fpsCounter.Fps,
             _camera.ViewportWidth, _camera.ViewportHeight);
         _spriteBatch.End();
 
@@ -222,6 +231,7 @@ public sealed class GameRoot : Game
     {
         if (disposing)
         {
+            _primitives?.Dispose();
             _pixel?.Dispose();
             _spriteBatch?.Dispose();
         }

@@ -17,24 +17,25 @@ Three layers, top-down:
 
 ```
 Per-frame (runs at render rate, 60+Hz):
-  Input.Poll                              (snapshot keyboard / mouse)
-  ├─► CameraSystem.Update                 (mutates Camera2D from input)
-  ├─► Camera2D.ClampTo                    (keep camera in world bounds)
-  ├─► (build mode key handling)           (toggles PlacementSystem, picks defn)
-  ├─► (LMB in build mode → Command)       (input translator enqueues PlaceBuildingCommand)
-  ├─► Persistence keys (F5 / F9)          (serializer reads/writes World+ResSys)
-  └─► SimClock.Advance(dt) → N            (returns whole sim ticks to run now)
+  Input.Poll                              (snapshot keyboard / mouse + deltas)
+  ├─► RtsCameraController.Update         (WASD pan, RMB-drag rotate, scroll zoom)
+  ├─► RtsCamera3D.ClampTargetTo          (keep target inside the world rectangle)
+  ├─► (build mode key handling)          (toggles PlacementSystem, picks defn)
+  ├─► (LMB in build mode → Command)      (ScreenToGround → tile → PlaceBuildingCommand)
+  ├─► Persistence keys (F5 / F9)         (serializer reads/writes World+ResSys)
+  └─► SimClock.Advance(dt) → N           (returns whole sim ticks to run now)
 
 For each of N ticks (sim, fixed 50ms dt):
   ├─► ResourceSystem.Update(world, 0.05)  (deterministic income tick)
   └─► CommandProcessor.ProcessAll         (drains buffer → systems mutate World)
 
 Draw
-  │ Begin SpriteBatch with camera transform
-  ├─► GridRenderer.Draw                  (visible tiles only — view-culled)
-  ├─► BuildingRenderer.Draw              (all placed buildings)
-  └─► BuildingRenderer.DrawGhost         (only in build mode)
-  │ End. Begin SpriteBatch (identity, screen space)
+  │ Configure 3D pipeline (depth on, NonPremultiplied, CullCCW)
+  │ PrimitiveRenderer.SetCamera(View, Projection)
+  ├─► GridRenderer3D.Draw                (ground plane + grid lines)
+  ├─► BuildingRenderer3D.Draw            (all placed buildings as cubes)
+  └─► BuildingRenderer3D.DrawGhost       (translucent cube; only in build mode)
+  │ SpriteBatch.Begin (identity, screen space)
   └─► Hud.Draw                           (credits / FPS / build mode / hint)
 ```
 
@@ -63,6 +64,18 @@ Render runs at the host's framerate; the simulation advances in fixed 50ms steps
 Why fixed-step: peers in a lockstep MP match (Phase 4) must all step the same number of times with the same dt regardless of local framerate. Hard-coding this now means the gameplay logic we write in Phase 2/3 is already framerate-independent.
 
 `Advance` caps catch-up at `DefaultMaxStepsPerAdvance` (5) to prevent a spiral of death after long stalls (debugger break, GPU hang). Residual time stays in the accumulator and is consumed on subsequent calls.
+
+## 3D rendering (post-prereqs)
+
+The world is rendered in 3D using MonoGame's `BasicEffect` + a single shared unit-cube mesh. **One world unit = one tile.** Y is up; the ground plane is Y=0. `Grid.TileSize` is now a vestigial pixel field carried by serialisation only; renderers don't read it.
+
+`RtsCamera3D` is the orbit camera (target, yaw, pitch, distance → `View` + `Projection`). `RtsCameraController` drives it from input — **WASD pans the target relative to camera yaw, RMB drag rotates yaw + pitch, scroll wheel zooms, F2 toggles edge-scroll**. Mouse-to-tile is a screen-ray vs Y=0 plane intersection via `RtsCamera3D.ScreenToGround`.
+
+Drawing: `PrimitiveRenderer.SetCamera(view, proj)` once per frame, then `GridRenderer3D.Draw` + `BuildingRenderer3D.Draw` + ghost cube in build mode. HUD is still `SpriteBatch` in identity transform after the 3D pass.
+
+The camera deliberately lives in `Rendering/`, not `Systems/`, because it never mutates `World`. That keeps the determinism scanner (`DeterminismDisciplineTests`) able to forbid transcendentals like `Math.Sin/Cos` in `Systems/` while the camera math freely uses them.
+
+When you add a new building type, also pick a render height in `BuildingRenderer3D.HeightOf` so it's visually distinct from a 1×1 collector.
 
 ## Determinism discipline (Phase 2 prereq #5)
 

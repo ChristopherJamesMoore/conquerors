@@ -1,5 +1,6 @@
 using Conquerors.Core;
 using Conquerors.Data;
+using Conquerors.Rendering;
 using Conquerors.Systems;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -25,7 +26,7 @@ public sealed class Hud
         SpriteBatch sb,
         World world,
         PlacementSystem placement,
-        CameraSystem cameraSystem,
+        RtsCameraController cameraSystem,
         int fps,
         int viewportWidth,
         int viewportHeight)

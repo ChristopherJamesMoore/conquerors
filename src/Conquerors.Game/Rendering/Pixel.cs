@@ -4,8 +4,8 @@ using Microsoft.Xna.Framework.Graphics;
 namespace Conquerors.Rendering;
 
 /// <summary>
-/// A 1x1 white texture used as a generic quad source. Renderers tint it
-/// to draw arbitrary coloured rectangles without any art assets.
+/// A 1x1 white texture used by screen-space (SpriteBatch) HUD elements.
+/// The 3D scene doesn't need it — meshes carry their own colour.
 /// </summary>
 public sealed class Pixel : System.IDisposable
 {
